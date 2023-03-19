@@ -51,6 +51,8 @@ list_ele_t* list_ele_free(list_ele_t *item) {
   char *value = item->value;
   if (value) free(value);
   list_ele_t *next = item->next;
+  free(item);
+
   return next;
 }
 
