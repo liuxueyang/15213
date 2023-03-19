@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 /**
  * @brief Allocates a new queue
@@ -25,9 +26,32 @@
  */
 queue_t *queue_new(void) {
     queue_t *q = malloc(sizeof(queue_t));
+
+    if (!q) {
+        printf("malloc failed for queue_t in queue_new\n");
+        return q;
+    }
+
     /* What if malloc returned NULL? */
     q->head = NULL;
+    q->tail = NULL;
+    q->size = 0;
+
     return q;
+}
+
+/**
+ * @brief Frees a list element and the value field
+ *
+ * @return next list element
+ */
+list_ele_t* list_ele_free(list_ele_t *item) {
+    if (!item) return item;
+
+    char *value = item->value;
+    free(value);
+    list_ele_t *next = item->next;
+    return next;
 }
 
 /**
@@ -35,7 +59,23 @@ queue_t *queue_new(void) {
  * @param[in] q The queue to free
  */
 void queue_free(queue_t *q) {
+    if (!q) return;
+
+    list_ele_t *head = q->head;
+
+    if (!head) {
+        free(q);
+        return;
+    }
+
     /* How about freeing the list elements and the strings? */
+
+    list_ele_t *cur = head;
+    while (cur) {
+        cur = list_ele_free(cur);
+        q->size--;
+    }
+    
     /* Free queue structure */
     free(q);
 }
@@ -53,13 +93,50 @@ void queue_free(queue_t *q) {
  * @return false if q is NULL, or memory allocation failed
  */
 bool queue_insert_head(queue_t *q, const char *s) {
-    list_ele_t *newh;
     /* What should you do if the q is NULL? */
+    if (!q) return false;
+
+    list_ele_t *newh;
     newh = malloc(sizeof(list_ele_t));
+    if (!newh) {
+        printf("malloc for list_ele_t in queue_insert_head failed\n");
+        return false;
+    }
+
     /* Don't forget to allocate space for the string and copy it */
     /* What if either call to malloc returns NULL? */
+    size_t len = strlen(s);
+    if (len + 1 < len) {
+        printf("length is too large and malloc size is overflow\n");
+        free(newh);
+
+        return false;
+    }
+
+    newh->value = malloc(len + 1);
+    if (!newh->value) {
+        printf("malloc for string in queue_insert_head failed\n");
+        free(newh);
+
+        return false;
+    }
+
+    strcpy(newh->value, s);
+
     newh->next = q->head;
     q->head = newh;
+
+    if (!q->tail) {
+        /* head and tail are the same element */
+        q->tail = q->head;
+    }
+    
+    if (q->size + 1 < q->size) {
+        printf("Too many elements, queue_t.size overflow\n");
+    } else {
+        q->size++;
+    }
+
     return true;
 }
 
@@ -78,7 +155,52 @@ bool queue_insert_head(queue_t *q, const char *s) {
 bool queue_insert_tail(queue_t *q, const char *s) {
     /* You need to write the complete code for this function */
     /* Remember: It should operate in O(1) time */
-    return false;
+    if (!q) return false;
+
+    list_ele_t *newh;
+    newh = malloc(sizeof(list_ele_t));
+    if (!newh) {
+        printf("malloc for list_ele_t in queue_insert_tail failed\n");
+        return false;
+    }
+
+    size_t len = strlen(s);
+    if (len + 1 < len) {
+        printf("length is too large and malloc size is overflow\n");
+        free(newh);
+
+        return false;
+    }
+
+    newh->value = malloc(len + 1);
+    if (!newh->value) {
+        printf("malloc for string in queue_insert_tail failed\n");
+        free(newh);
+
+        return false;
+    }
+
+    strcpy(newh->value, s);
+
+    newh->next = NULL;
+
+    list_ele_t *tail = q->tail;
+    if (tail) {
+        tail->next = newh;
+    } else {
+        /* head must be empty, so set it to point to tail */
+        q->head = newh;
+    }
+
+    q->tail = newh;
+    
+    if (q->size + 1 < q->size) {
+        printf("Too many elements, queue_t.size overflow\n");
+    } else {
+        q->size++;
+    }
+
+    return true;
 }
 
 /**
@@ -99,8 +221,30 @@ bool queue_insert_tail(queue_t *q, const char *s) {
  * @return false if q is NULL or empty
  */
 bool queue_remove_head(queue_t *q, char *buf, size_t bufsize) {
-    /* You need to fix up this code. */
-    q->head = q->head->next;
+    if (!q) return false;
+
+    list_ele_t *head = q->head;
+    if (!head) return false;
+
+    /* param checking */
+    if (buf && !bufsize) {
+            printf("bufsize should be nonzero\n");
+
+            return false;
+    }
+
+    list_ele_t *next = head->next;
+    q->head = next;
+
+    if (buf) {
+        strncpy(buf, head->value, bufsize - 1);
+        buf[bufsize - 1] = '\0';
+    }
+
+    list_ele_free(head);
+
+    q->size--;
+
     return true;
 }
 
@@ -115,9 +259,12 @@ bool queue_remove_head(queue_t *q, char *buf, size_t bufsize) {
  *         0 if q is NULL or empty
  */
 size_t queue_size(queue_t *q) {
+    if (!q) return 0;
+    if (!q->head) return 0;
+
     /* You need to write the code for this function */
     /* Remember: It should operate in O(1) time */
-    return 0;
+    return q->size;
 }
 
 /**
@@ -130,5 +277,20 @@ size_t queue_size(queue_t *q) {
  * @param[in] q The queue to reverse
  */
 void queue_reverse(queue_t *q) {
-    /* You need to write the code for this function */
+    if (!q) return;
+    if (!q->head) return;
+
+    list_ele_t *p1 = q->head, *p2 = p1->next, *p3;
+
+    p1->next = NULL;
+
+    while (p2) {
+        p3 = p2->next;
+        p2->next = p1;
+        p1 = p2;
+        p2 = p3;
+    }
+
+    q->tail = q->head;
+    q->head = p1;
 }
